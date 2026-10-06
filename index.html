@@ -118,14 +118,48 @@ shareBtn.addEventListener("click", async ()=>{
   setStatus("Solicitando permiso para compartir pantalla...");
 
   try{
+    // La captura de pantalla web necesita HTTPS (o localhost) y
+    // compatibilidad del navegador. En móviles la compatibilidad es limitada.
+    if(!window.isSecureContext){
+      throw new Error("La página debe abrirse mediante HTTPS para compartir pantalla.");
+    }
+
     if(!navigator.mediaDevices?.getDisplayMedia){
+      const ua = navigator.userAgent || "";
+      const isIOS = /iPhone|iPad|iPod/i.test(ua);
+      const isAndroid = /Android/i.test(ua);
+
+      if(isIOS){
+        throw new Error("Este iPhone/iPad no permite compartir la pantalla desde este navegador. Para hacerlo necesitamos una app nativa o una solución basada en emisión del sistema.");
+      }
+      if(isAndroid){
+        throw new Error("Este navegador Android no permite compartir la pantalla. Prueba Chrome actualizado; si sigue sin aparecer la opción, el navegador no admite captura de pantalla.");
+      }
       throw new Error("Este navegador no permite compartir pantalla.");
     }
 
-    localStream = await navigator.mediaDevices.getDisplayMedia({
-      video:true,
-      audio:false
-    });
+    try {
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          cursor: "always",
+          frameRate: { ideal: 15, max: 30 }
+        },
+        audio: false,
+        selfBrowserSurface: "exclude",
+        surfaceSwitching: "include"
+      });
+    } catch (error) {
+      if(error.name === "NotAllowedError"){
+        throw new Error("Has cancelado o bloqueado el permiso para compartir la pantalla.");
+      }
+      if(error.name === "NotFoundError"){
+        throw new Error("El dispositivo no ofrece ninguna pantalla disponible para compartir.");
+      }
+      if(error.name === "NotReadableError"){
+        throw new Error("El sistema no permite leer la pantalla seleccionada.");
+      }
+      throw error;
+    }
 
     setStatus("Conectando...");
     const result = await createPeerWithCode();
