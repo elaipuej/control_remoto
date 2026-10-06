@@ -176,7 +176,25 @@ connectBtn.addEventListener("click", ()=>{
   });
 
   peer.on("open", ()=>{
-    const call = peer.call("pantalla-" + code, new MediaStream());
+    /*
+      PeerJS requiere que el emisor de la llamada proporcione un MediaStream.
+      El visor no necesita cámara ni micrófono, así que creamos una pista de
+      vídeo local de 1x1 píxel mediante Canvas. Sirve únicamente para iniciar
+      la negociación WebRTC; la pantalla real llega como stream remoto.
+    */
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, 1, 1);
+
+    if (!canvas.captureStream) {
+      throw new Error("Este navegador no permite iniciar una conexión de vídeo.");
+    }
+
+    const viewerStream = canvas.captureStream(1);
+    const call = peer.call("pantalla-" + code, viewerStream);
 
     if(!call){
       viewerStatus.textContent = "No se encontró esa pantalla.";
@@ -195,18 +213,30 @@ connectBtn.addEventListener("click", ()=>{
     call.on("close", ()=>{
       viewerStatus.textContent = "La conexión ha terminado.";
       setStatus("Desconectado.");
+      connectBtn.disabled = false;
+      viewerStream.getTracks().forEach(track => track.stop());
     });
 
     call.on("error", err=>{
-      console.error(err);
-      viewerStatus.textContent = "No se pudo conectar.";
+      console.error("Error WebRTC:", err);
+      viewerStatus.textContent = "No se pudo conectar: " + (err.message || "error WebRTC");
+      setStatus("Error de conexión.");
       connectBtn.disabled = false;
+      viewerStream.getTracks().forEach(track => track.stop());
     });
   });
 
   peer.on("error", err=>{
-    console.error(err);
-    viewerStatus.textContent = "No se encontró esa pantalla o la conexión falló.";
+    console.error("Error PeerJS:", err);
+    let message = "No se encontró esa pantalla o la conexión falló.";
+
+    if (err && err.type === "peer-unavailable") {
+      message = "No se encontró esa pantalla. Comprueba que el código sigue activo.";
+    } else if (err && err.message) {
+      message = "Error de conexión: " + err.message;
+    }
+
+    viewerStatus.textContent = message;
     setStatus("Error de conexión.");
     connectBtn.disabled = false;
   });
