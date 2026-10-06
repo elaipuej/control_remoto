@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ver Pantalla P2P</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:#0f172a;color:#e2e8f0;min-height:100vh;
+}
+.container{max-width:900px;margin:auto;padding:24px}
+.card{
+  background:#1e293b;border:1px solid #334155;border-radius:18px;
+  padding:22px;margin-bottom:18px;box-shadow:0 10px 30px #0003
+}
+h1{margin:0 0 8px;font-size:28px}
+h2{font-size:20px;margin-top:0}
+p{color:#94a3b8}
+button{
+  border:0;border-radius:10px;padding:12px 18px;font-size:15px;
+  font-weight:700;cursor:pointer;margin:5px 5px 5px 0;
+}
+.primary{background:#38bdf8;color:#082f49}
+.secondary{background:#475569;color:white}
+.danger{background:#ef4444;color:white}
+textarea{
+  width:100%;min-height:130px;background:#0f172a;color:#e2e8f0;
+  border:1px solid #475569;border-radius:10px;padding:12px;
+  font-family:monospace;resize:vertical
+}
+input{
+  width:100%;padding:12px;border-radius:10px;border:1px solid #475569;
+  background:#0f172a;color:white;font-size:16px
+}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.status{padding:12px;border-radius:10px;background:#0f172a;color:#7dd3fc}
+#remoteVideo{
+  width:100%;background:#000;border-radius:12px;display:block;
+  max-height:70vh;object-fit:contain
+}
+.hidden{display:none}
+.small{font-size:13px}
+.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#334155}
+@media(max-width:700px){.row{grid-template-columns:1fr}.container{padding:14px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h1>📺 Ver Pantalla P2P</h1>
+    <p>Comparte la pantalla de un dispositivo y visualízala desde otro.</p>
+    <div class="status" id="status">Estado: esperando...</div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>🖥️ Quiero compartir mi pantalla</h2>
+      <p>Abre esto en el dispositivo cuya pantalla quieres transmitir.</p>
+      <button class="primary" id="shareBtn">Compartir pantalla</button>
+      <button class="secondary hidden" id="copyOfferBtn">Copiar código</button>
+      <p class="small">Después de crear la oferta, copia el contenido de abajo y pásaselo al dispositivo que va a mirar.</p>
+      <textarea id="offer" placeholder="Aquí aparecerá el código de conexión..." readonly></textarea>
+      <p class="small">Cuando el otro dispositivo te devuelva su respuesta, pégala aquí:</p>
+      <textarea id="answerInput" placeholder="Pega aquí la respuesta..."></textarea>
+      <button class="primary" id="applyAnswerBtn">Conectar</button>
+    </div>
+
+    <div class="card">
+      <h2>👀 Quiero ver una pantalla</h2>
+      <p>Abre esto en el dispositivo desde el que quieres mirar.</p>
+      <p class="small">Pega aquí el código que te ha enviado quien comparte la pantalla:</p>
+      <textarea id="offerInput" placeholder="Pega aquí el código de conexión..."></textarea>
+      <button class="primary" id="createAnswerBtn">Conectar y generar respuesta</button>
+      <p class="small">Devuelve este código al dispositivo que comparte:</p>
+      <textarea id="answer" placeholder="Aquí aparecerá la respuesta..." readonly></textarea>
+      <button class="secondary hidden" id="copyAnswerBtn">Copiar respuesta</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="viewerCard">
+    <h2>📺 Pantalla remota</h2>
+    <video id="remoteVideo" autoplay playsinline controls></video>
+    <button class="danger" id="disconnectBtn">Desconectar</button>
+  </div>
+</div>
+
+<script>
+let pc = null;
+let localStream = null;
+let isBroadcaster = false;
+
+const $ = id => document.getElementById(id);
+const status = msg => $("status").textContent = "Estado: " + msg;
+
+function newPeer() {
+  pc = new RTCPeerConnection({
+    iceServers: [
+      {urls:"stun:stun.l.google.com:19302"},
+      {urls:"stun:stun.cloudflare.com:3478"}
+    ]
+  });
+
+  pc.onconnectionstatechange = () => {
+    status("conexión: " + pc.connectionState);
+    if (pc.connectionState === "connected") {
+      $("viewerCard").classList.remove("hidden");
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    if (pc.iceConnectionState === "failed") {
+      status("no se pudo establecer la conexión. Puede ser necesaria una red diferente.");
+    }
+  };
+
+  pc.ontrack = e => {
+    const video = $("remoteVideo");
+    if (e.streams && e.streams[0]) {
+      video.srcObject = e.streams[0];
+      $("viewerCard").classList.remove("hidden");
+      video.play().catch(()=>{});
+    }
+  };
+}
+
+async function waitIceComplete() {
+  if (pc.iceGatheringState === "complete") return;
+  await new Promise(resolve => {
+    const timer = setTimeout(resolve, 8000);
+    pc.addEventListener("icegatheringstatechange", () => {
+      if (pc.iceGatheringState === "complete") {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+  });
+}
+
+function encode(obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+}
+
+function decode(str) {
+  return JSON.parse(decodeURIComponent(escape(atob(str.trim()))));
+}
+
+$("shareBtn").onclick = async () => {
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      alert("Este navegador no permite compartir pantalla.");
+      return;
+    }
+
+    localStream = await navigator.mediaDevices.getDisplayMedia({
+      video: {cursor:"always"},
+      audio: false
+    });
+
+    newPeer();
+    isBroadcaster = true;
+
+    localStream.getTracks().forEach(track => {
+      pc.addTrack(track, localStream);
+      track.onended = () => {
+        status("la pantalla compartida ha terminado");
+      };
+    });
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    status("preparando conexión...");
+    await waitIceComplete();
+
+    $("offer").value = encode(pc.localDescription);
+    $("copyOfferBtn").classList.remove("hidden");
+    status("código creado. Envíalo al dispositivo que va a mirar.");
+  } catch(e) {
+    status("error: " + e.message);
+  }
+};
+
+$("createAnswerBtn").onclick = async () => {
+  try {
+    const offerText = $("offerInput").value.trim();
+    if (!offerText) return alert("Pega primero el código del dispositivo que comparte.");
+
+    newPeer();
+    isBroadcaster = false;
+
+    const offer = decode(offerText);
+    await pc.setRemoteDescription(offer);
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    status("preparando respuesta...");
+    await waitIceComplete();
+
+    $("answer").value = encode(pc.localDescription);
+    $("copyAnswerBtn").classList.remove("hidden");
+    status("respuesta creada. Devuélvela al dispositivo que comparte.");
+  } catch(e) {
+    status("error: " + e.message);
+  }
+};
+
+$("applyAnswerBtn").onclick = async () => {
+  try {
+    const text = $("answerInput").value.trim();
+    if (!text) return alert("Pega primero la respuesta del otro dispositivo.");
+    if (!pc) return alert("Primero pulsa «Compartir pantalla».");
+
+    await pc.setRemoteDescription(decode(text));
+    status("conectando...");
+  } catch(e) {
+    status("error: " + e.message);
+  }
+};
+
+$("copyOfferBtn").onclick = async () => {
+  await navigator.clipboard.writeText($("offer").value);
+  status("código copiado");
+};
+
+$("copyAnswerBtn").onclick = async () => {
+  await navigator.clipboard.writeText($("answer").value);
+  status("respuesta copiada");
+};
+
+$("disconnectBtn").onclick = () => {
+  if (pc) pc.close();
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  $("remoteVideo").srcObject = null;
+  $("viewerCard").classList.add("hidden");
+  status("desconectado");
+};
+</script>
+</body>
+</html>
