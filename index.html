@@ -3,238 +3,218 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ver Pantalla P2P</title>
+<title>Ver pantalla</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
 *{box-sizing:border-box}
-body{
-  margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-  background:#0f172a;color:#e2e8f0;min-height:100vh;
-}
-.container{max-width:900px;margin:auto;padding:24px}
-.card{
-  background:#1e293b;border:1px solid #334155;border-radius:18px;
-  padding:22px;margin-bottom:18px;box-shadow:0 10px 30px #0003
-}
-h1{margin:0 0 8px;font-size:28px}
-h2{font-size:20px;margin-top:0}
-p{color:#94a3b8}
-button{
-  border:0;border-radius:10px;padding:12px 18px;font-size:15px;
-  font-weight:700;cursor:pointer;margin:5px 5px 5px 0;
-}
-.primary{background:#38bdf8;color:#082f49}
-.secondary{background:#475569;color:white}
-.danger{background:#ef4444;color:white}
-textarea{
-  width:100%;min-height:130px;background:#0f172a;color:#e2e8f0;
-  border:1px solid #475569;border-radius:10px;padding:12px;
-  font-family:monospace;resize:vertical
-}
-input{
-  width:100%;padding:12px;border-radius:10px;border:1px solid #475569;
-  background:#0f172a;color:white;font-size:16px
-}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.status{padding:12px;border-radius:10px;background:#0f172a;color:#7dd3fc}
-#remoteVideo{
-  width:100%;background:#000;border-radius:12px;display:block;
-  max-height:70vh;object-fit:contain
-}
+body{margin:0;background:#0f172a;color:#f8fafc;font-family:Arial,sans-serif}
+.app{max-width:760px;margin:auto;padding:24px 16px}
+h1{text-align:center;font-size:28px;margin:8px 0 28px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{background:#1e293b;border-radius:18px;padding:22px;text-align:center}
+h2{margin:0 0 10px;font-size:20px}
+p{color:#cbd5e1;line-height:1.45}
+button{width:100%;border:0;border-radius:12px;padding:15px;margin-top:10px;
+font-size:17px;font-weight:bold;cursor:pointer;background:#38bdf8;color:#082f49}
+button:disabled{opacity:.45;cursor:not-allowed}
+input{width:100%;padding:15px;border-radius:12px;border:2px solid #475569;
+background:#0f172a;color:white;text-align:center;font-size:28px;letter-spacing:8px}
+.code{font-size:48px;letter-spacing:12px;font-weight:bold;margin:20px 0;color:#38bdf8}
+.status{text-align:center;margin:18px 0;color:#94a3b8}
+video{width:100%;background:#000;border-radius:14px;margin-top:18px}
 .hidden{display:none}
-.small{font-size:13px}
-.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#334155}
-@media(max-width:700px){.row{grid-template-columns:1fr}.container{padding:14px}}
+.note{font-size:13px;color:#94a3b8;margin-top:12px}
+@media(max-width:650px){.grid{grid-template-columns:1fr}.app{padding:16px 12px}}
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="card">
-    <h1>📺 Ver Pantalla P2P</h1>
-    <p>Comparte la pantalla de un dispositivo y visualízala desde otro.</p>
-    <div class="status" id="status">Estado: esperando...</div>
-  </div>
+<div class="app">
+<h1>📺 Ver pantalla</h1>
 
-  <div class="row">
-    <div class="card">
-      <h2>🖥️ Quiero compartir mi pantalla</h2>
-      <p>Abre esto en el dispositivo cuya pantalla quieres transmitir.</p>
-      <button class="primary" id="shareBtn">Compartir pantalla</button>
-      <button class="secondary hidden" id="copyOfferBtn">Copiar código</button>
-      <p class="small">Después de crear la oferta, copia el contenido de abajo y pásaselo al dispositivo que va a mirar.</p>
-      <textarea id="offer" placeholder="Aquí aparecerá el código de conexión..." readonly></textarea>
-      <p class="small">Cuando el otro dispositivo te devuelva su respuesta, pégala aquí:</p>
-      <textarea id="answerInput" placeholder="Pega aquí la respuesta..."></textarea>
-      <button class="primary" id="applyAnswerBtn">Conectar</button>
-    </div>
+<div class="grid">
+<section class="card">
+<h2>🖥️ Compartir pantalla</h2>
+<p>Pulsa el botón y permite al navegador compartir tu pantalla.</p>
+<button id="share">Compartir mi pantalla</button>
+<div id="shareCode" class="hidden">
+<p>Tu código es:</p>
+<div class="code" id="code">----</div>
+<p>Indica estas 4 cifras a la persona que va a ver tu pantalla.</p>
+</div>
+</section>
 
-    <div class="card">
-      <h2>👀 Quiero ver una pantalla</h2>
-      <p>Abre esto en el dispositivo desde el que quieres mirar.</p>
-      <p class="small">Pega aquí el código que te ha enviado quien comparte la pantalla:</p>
-      <textarea id="offerInput" placeholder="Pega aquí el código de conexión..."></textarea>
-      <button class="primary" id="createAnswerBtn">Conectar y generar respuesta</button>
-      <p class="small">Devuelve este código al dispositivo que comparte:</p>
-      <textarea id="answer" placeholder="Aquí aparecerá la respuesta..." readonly></textarea>
-      <button class="secondary hidden" id="copyAnswerBtn">Copiar respuesta</button>
-    </div>
-  </div>
+<section class="card">
+<h2>👀 Ver pantalla</h2>
+<p>Introduce las 4 cifras que te han dado.</p>
+<input id="remoteId" inputmode="numeric" maxlength="4" placeholder="0000" aria-label="Código de 4 cifras">
+<button id="connect">Ver pantalla</button>
+<p id="viewerStatus" class="note"></p>
+</section>
+</div>
 
-  <div class="card hidden" id="viewerCard">
-    <h2>📺 Pantalla remota</h2>
-    <video id="remoteVideo" autoplay playsinline controls></video>
-    <button class="danger" id="disconnectBtn">Desconectar</button>
-  </div>
+<div id="viewer" class="card hidden" style="margin-top:18px">
+<h2>Pantalla remota</h2>
+<video id="remoteVideo" autoplay playsinline controls></video>
+</div>
+
+<div class="status" id="status">Listo</div>
+<p class="note" style="text-align:center">
+La conexión de vídeo se realiza mediante WebRTC. El dispositivo que comparte
+debe aceptar el permiso del navegador.
+</p>
 </div>
 
 <script>
-let pc = null;
+const shareBtn = document.getElementById("share");
+const connectBtn = document.getElementById("connect");
+const remoteIdInput = document.getElementById("remoteId");
+const codeBox = document.getElementById("shareCode");
+const codeEl = document.getElementById("code");
+const statusEl = document.getElementById("status");
+const viewerStatus = document.getElementById("viewerStatus");
+const viewerBox = document.getElementById("viewer");
+const video = document.getElementById("remoteVideo");
+
+let peer = null;
 let localStream = null;
-let isBroadcaster = false;
 
-const $ = id => document.getElementById(id);
-const status = msg => $("status").textContent = "Estado: " + msg;
+function setStatus(text){ statusEl.textContent = text; }
 
-function newPeer() {
-  pc = new RTCPeerConnection({
-    iceServers: [
-      {urls:"stun:stun.l.google.com:19302"},
-      {urls:"stun:stun.cloudflare.com:3478"}
-    ]
-  });
-
-  pc.onconnectionstatechange = () => {
-    status("conexión: " + pc.connectionState);
-    if (pc.connectionState === "connected") {
-      $("viewerCard").classList.remove("hidden");
-    }
-  };
-
-  pc.oniceconnectionstatechange = () => {
-    if (pc.iceConnectionState === "failed") {
-      status("no se pudo establecer la conexión. Puede ser necesaria una red diferente.");
-    }
-  };
-
-  pc.ontrack = e => {
-    const video = $("remoteVideo");
-    if (e.streams && e.streams[0]) {
-      video.srcObject = e.streams[0];
-      $("viewerCard").classList.remove("hidden");
-      video.play().catch(()=>{});
-    }
-  };
+function randomCode(){
+  return String(Math.floor(1000 + Math.random()*9000));
 }
 
-async function waitIceComplete() {
-  if (pc.iceGatheringState === "complete") return;
-  await new Promise(resolve => {
-    const timer = setTimeout(resolve, 8000);
-    pc.addEventListener("icegatheringstatechange", () => {
-      if (pc.iceGatheringState === "complete") {
-        clearTimeout(timer);
-        resolve();
-      }
+/*
+  PeerJS necesita un identificador único. Usamos el código de 4 cifras
+  solicitado por el usuario. Si está ocupado, se genera otro.
+*/
+async function createPeerWithCode(){
+  return new Promise((resolve,reject)=>{
+    const code = randomCode();
+    const p = new Peer("pantalla-" + code, {
+      debug: 0
+    });
+
+    const timeout = setTimeout(()=>{
+      p.destroy();
+      reject(new Error("No se pudo conectar con el servicio de conexión."));
+    }, 10000);
+
+    p.once("open", id=>{
+      clearTimeout(timeout);
+      resolve({peer:p, code});
+    });
+
+    p.once("error", err=>{
+      clearTimeout(timeout);
+      p.destroy();
+      reject(err);
     });
   });
 }
 
-function encode(obj) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
-}
+shareBtn.addEventListener("click", async ()=>{
+  shareBtn.disabled = true;
+  setStatus("Solicitando permiso para compartir pantalla...");
 
-function decode(str) {
-  return JSON.parse(decodeURIComponent(escape(atob(str.trim()))));
-}
-
-$("shareBtn").onclick = async () => {
-  try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-      alert("Este navegador no permite compartir pantalla.");
-      return;
+  try{
+    if(!navigator.mediaDevices?.getDisplayMedia){
+      throw new Error("Este navegador no permite compartir pantalla.");
     }
 
     localStream = await navigator.mediaDevices.getDisplayMedia({
-      video: {cursor:"always"},
-      audio: false
+      video:true,
+      audio:false
     });
 
-    newPeer();
-    isBroadcaster = true;
+    setStatus("Conectando...");
+    const result = await createPeerWithCode();
+    peer = result.peer;
 
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
-      track.onended = () => {
-        status("la pantalla compartida ha terminado");
-      };
+    codeEl.textContent = result.code;
+    codeBox.classList.remove("hidden");
+    setStatus("Esperando a que alguien introduzca el código...");
+
+    localStream.getVideoTracks()[0].addEventListener("ended", ()=>{
+      setStatus("Has dejado de compartir la pantalla.");
+      if(peer) peer.destroy();
+      shareBtn.disabled = false;
     });
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    status("preparando conexión...");
-    await waitIceComplete();
+    peer.on("call", call=>{
+      call.answer(localStream);
+      call.on("close", ()=>{
+        setStatus("El espectador se ha desconectado.");
+      });
+    });
 
-    $("offer").value = encode(pc.localDescription);
-    $("copyOfferBtn").classList.remove("hidden");
-    status("código creado. Envíalo al dispositivo que va a mirar.");
-  } catch(e) {
-    status("error: " + e.message);
+  }catch(error){
+    console.error(error);
+    setStatus("Error: " + error.message);
+    shareBtn.disabled = false;
+    if(localStream){
+      localStream.getTracks().forEach(t=>t.stop());
+      localStream=null;
+    }
   }
-};
+});
 
-$("createAnswerBtn").onclick = async () => {
-  try {
-    const offerText = $("offerInput").value.trim();
-    if (!offerText) return alert("Pega primero el código del dispositivo que comparte.");
+connectBtn.addEventListener("click", ()=>{
+  const code = remoteIdInput.value.replace(/\D/g,"");
 
-    newPeer();
-    isBroadcaster = false;
-
-    const offer = decode(offerText);
-    await pc.setRemoteDescription(offer);
-
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    status("preparando respuesta...");
-    await waitIceComplete();
-
-    $("answer").value = encode(pc.localDescription);
-    $("copyAnswerBtn").classList.remove("hidden");
-    status("respuesta creada. Devuélvela al dispositivo que comparte.");
-  } catch(e) {
-    status("error: " + e.message);
+  if(code.length !== 4){
+    viewerStatus.textContent = "Introduce exactamente 4 cifras.";
+    return;
   }
-};
 
-$("applyAnswerBtn").onclick = async () => {
-  try {
-    const text = $("answerInput").value.trim();
-    if (!text) return alert("Pega primero la respuesta del otro dispositivo.");
-    if (!pc) return alert("Primero pulsa «Compartir pantalla».");
+  connectBtn.disabled = true;
+  viewerStatus.textContent = "Conectando...";
+  setStatus("Buscando la pantalla " + code + "...");
 
-    await pc.setRemoteDescription(decode(text));
-    status("conectando...");
-  } catch(e) {
-    status("error: " + e.message);
-  }
-};
+  peer = new Peer({
+    debug: 0
+  });
 
-$("copyOfferBtn").onclick = async () => {
-  await navigator.clipboard.writeText($("offer").value);
-  status("código copiado");
-};
+  peer.on("open", ()=>{
+    const call = peer.call("pantalla-" + code, new MediaStream());
 
-$("copyAnswerBtn").onclick = async () => {
-  await navigator.clipboard.writeText($("answer").value);
-  status("respuesta copiada");
-};
+    if(!call){
+      viewerStatus.textContent = "No se encontró esa pantalla.";
+      connectBtn.disabled = false;
+      return;
+    }
 
-$("disconnectBtn").onclick = () => {
-  if (pc) pc.close();
-  if (localStream) localStream.getTracks().forEach(t => t.stop());
-  $("remoteVideo").srcObject = null;
-  $("viewerCard").classList.add("hidden");
-  status("desconectado");
-};
+    call.on("stream", remoteStream=>{
+      video.srcObject = remoteStream;
+      viewerBox.classList.remove("hidden");
+      viewerStatus.textContent = "Conectado.";
+      setStatus("Pantalla conectada.");
+      video.play().catch(()=>{});
+    });
+
+    call.on("close", ()=>{
+      viewerStatus.textContent = "La conexión ha terminado.";
+      setStatus("Desconectado.");
+    });
+
+    call.on("error", err=>{
+      console.error(err);
+      viewerStatus.textContent = "No se pudo conectar.";
+      connectBtn.disabled = false;
+    });
+  });
+
+  peer.on("error", err=>{
+    console.error(err);
+    viewerStatus.textContent = "No se encontró esa pantalla o la conexión falló.";
+    setStatus("Error de conexión.");
+    connectBtn.disabled = false;
+  });
+});
+
+remoteIdInput.addEventListener("input", ()=>{
+  remoteIdInput.value = remoteIdInput.value.replace(/\D/g,"").slice(0,4);
+});
 </script>
 </body>
 </html>
